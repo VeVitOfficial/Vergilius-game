@@ -10,8 +10,22 @@
   <body>
     <canvas id="game-canvas"></canvas>
 
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="overlay" style="display:flex; z-index:500;">
+      <div class="loading-content">
+        <h1 class="loading-title">VERGILIUS</h1>
+        <p class="loading-subtitle">Aeneas redit Romam...</p>
+        <div class="loading-bar-container">
+          <div id="loading-bar-fill" class="loading-bar-fill"></div>
+        </div>
+        <p id="loading-status" class="loading-status">Inicializace...</p>
+        <p id="loading-percent" class="loading-percent">0%</p>
+        <p class="loading-hint">První načtení může trvat až minutu.</p>
+      </div>
+    </div>
+
     <!-- MENU OVERLAY -->
-    <div id="menu-overlay" class="overlay">
+    <div id="menu-overlay" class="overlay" style="display:none;">
       <div class="menu-content">
         <h1>VERGILIUS</h1>
         <p class="subtitle">Ztracené knihy Říma</p>

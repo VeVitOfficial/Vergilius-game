@@ -17,7 +17,7 @@ export class InteriorManager {
         this.createPantheon();
         this.createDomus();
         this.createColosseumUnderground();
-        this.createTempleApollo();
+        this.createTempleJovis();
     }
 
     enter(id, camera) {
@@ -279,9 +279,9 @@ export class InteriorManager {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  TEMPLE OF APOLLO
+    //  TEMPLUM JOVIS CAPITOLINI
     // ═══════════════════════════════════════════════════════════════
-    createTempleApollo() {
+    createTempleJovis() {
         const id = 'temple';
         const ox = 1060, oz = 0;
         const group = new THREE.Group();
@@ -347,7 +347,7 @@ export class InteriorManager {
         this.interiors.set(id, {
             group, colliders,
             spawnPos: new THREE.Vector3(ox, PLAYER.eyeHeight, oz + 3),
-            returnPos: new THREE.Vector3(25, 0, -30),
+            returnPos: new THREE.Vector3(5, 0, -35),
             exitPos: new THREE.Vector3(ox, PLAYER.eyeHeight, oz + 5 - 0.5)
         });
     }

@@ -6,8 +6,9 @@ import { PAVEMENT_MATERIAL, GRASS_MATERIAL } from './textures.js';
  * TerrainManager — generuje podlahu světa s texturami, biomy a animovanou vodou.
  */
 export class TerrainManager {
-    constructor(scene) {
+    constructor(scene, assetLoader = null) {
         this.scene = scene;
+        this.assetLoader = assetLoader;
         this.meshes = [];
     }
 
@@ -18,11 +19,20 @@ export class TerrainManager {
         this.createWater();
     }
 
-    /** Hlavní kamenná podlaha s dlaždicovou texturou */
+    /** Hlavní kamenná podlaha — PBR textura nebo fallback */
     createGround() {
         const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 1, 1);
-        const mat = PAVEMENT_MATERIAL.clone();
-        mat.color.setHex(COLORS.ground);
+        let mat;
+
+        const pbrMat = this.assetLoader ? this.assetLoader.createMaterial('paving', { repeat: [40, 40], roughness: 0.95 }) : null;
+        if (pbrMat) {
+            mat = pbrMat;
+            mat.color.setHex(COLORS.ground);
+        } else {
+            mat = PAVEMENT_MATERIAL.clone();
+            mat.color.setHex(COLORS.ground);
+        }
+
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
         mesh.receiveShadow = true;
@@ -30,24 +40,28 @@ export class TerrainManager {
         this.meshes.push(mesh);
     }
 
-    /** Cesty — texturované pruhy */
+    /** Cesty — PBR textura nebo fallback */
     createRoads() {
-        const roadMat = PAVEMENT_MATERIAL.clone();
-        roadMat.color.setHex(COLORS.road);
+        let roadMat;
+        const pbrMat = this.assetLoader ? this.assetLoader.createMaterial('concrete', { repeat: [20, 4], roughness: 0.9 }) : null;
+        if (pbrMat) {
+            roadMat = pbrMat;
+            roadMat.color.setHex(COLORS.road);
+        } else {
+            roadMat = PAVEMENT_MATERIAL.clone();
+            roadMat.color.setHex(COLORS.road);
+        }
 
-        // Hlavní východozápadní cesta
         const hRoad = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE, 4), roadMat);
         hRoad.rotation.x = -Math.PI / 2;
         hRoad.position.y = 0.02;
         this.scene.add(hRoad);
 
-        // Hlavní severojížní cesta
         const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(4, WORLD_SIZE), roadMat);
         vRoad.rotation.x = -Math.PI / 2;
         vRoad.position.y = 0.02;
         this.scene.add(vRoad);
 
-        // Vedlejší cesta k přístavu
         const pierRoad = new THREE.Mesh(new THREE.PlaneGeometry(20, 2), roadMat);
         pierRoad.rotation.x = -Math.PI / 2;
         pierRoad.position.set(35, 0.02, 30);

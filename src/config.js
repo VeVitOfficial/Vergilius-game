@@ -12,7 +12,7 @@ export const PLAYER = {
     height: 1.6,
     fov: 75,
     near: 0.1,
-    far: 250
+    far: 120
 };
 
 // Domus Vergilii — blízko centra, u Pantheonu
@@ -25,10 +25,10 @@ export const HOME = {
 // 5 knih na ikonických místech Říma
 export const BOOKS = [
     { id: 'AENEIS_I',   name: 'AENEIS I',   x: 75,  z: 65,  y: 1.2 }, // Tibera nábřeží
-    { id: 'AENEIS_II',  name: 'AENEIS II',  x: 25,  z: 45,  y: 1.2 }, // Foro Romano ruiny
+    { id: 'AENEIS_II',  name: 'AENEIS II',  x: 25,  z: 45,  y: 1.2 }, // Forum Romano
     { id: 'AENEIS_VI',  name: 'AENEIS VI',  x: 70,  z: 55,  y: 0.5 }, // Koloseum podzemí
-    { id: 'GEORGICA',   name: 'GEORGICA',   x: -65, z: -55, y: 1.2 }, // Vatikánské zahrady
-    { id: 'BUCOLICA',   name: 'BUCOLICA',   x: -40, z: -70, y: 1.2 }  // Villa Borghese
+    { id: 'GEORGICA',   name: 'GEORGICA',   x: -40, z: -50, y: 1.2 }, // Mausoleum Augusti
+    { id: 'BUCOLICA',   name: 'BUCOLICA',   x: -50, z: 55,  y: 1.2 }  // Thermae
 ];
 
 export const INTERACTION = {
@@ -42,7 +42,7 @@ export const DOORS = [
     { x: -5, z: 25, interiorId: 'pantheon', label: 'Pantheon' },
     { x: -5, z: -1, interiorId: 'domus', label: 'Domus Vergilii' },
     { x: 70, z: 65, interiorId: 'colosseum', label: 'Koloseum – podzemí' },
-    { x: 25, z: -35, interiorId: 'temple', label: 'Chrám Apolla' }
+    { x: 5, z: -35, interiorId: 'temple', label: 'Templum Jovis' }
 ];
 
 export const COLORS = {
@@ -76,43 +76,77 @@ export const COLORS = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-//  ZÁKLADNÍ BUDOVY (obytné bloky, tržiště, atd.)
+//  ZÓNY MĚSTA (procedurální layout)
 // ═══════════════════════════════════════════════════════════════
-export const BUILDINGS = [
-    // Trastevere (JZ za řekou)
-    { x: -75, z: 55, w: 5, d: 5, h: 6 }, { x: -65, z: 60, w: 4, d: 4, h: 5 },
-    { x: -80, z: 45, w: 4, d: 5, h: 5 }, { x: -70, z: 40, w: 5, d: 4, h: 6 },
-    { x: -60, z: 50, w: 4, d: 4, h: 5 },
-    // Centrum
-    { x: -15, z: -15, w: 4, d: 4, h: 5 }, { x: 5, z: -20, w: 5, d: 5, h: 6 },
-    { x: 20, z: -10, w: 4, d: 5, h: 5 }, { x: -10, z: 10, w: 5, d: 4, h: 6 },
-    { x: 15, z: 15, w: 4, d: 4, h: 5 }, { x: -25, z: 5, w: 4, d: 5, h: 5 },
-    { x: 30, z: 5, w: 5, d: 4, h: 6 }, { x: -20, z: 25, w: 5, d: 5, h: 5 },
-    { x: 10, z: 30, w: 4, d: 5, h: 5 }, { x: 35, z: 25, w: 4, d: 4, h: 6 },
-    // Sever
-    { x: -30, z: -40, w: 5, d: 5, h: 6 }, { x: -10, z: -45, w: 4, d: 4, h: 5 },
-    { x: 10, z: -40, w: 5, d: 5, h: 6 }, { x: 30, z: -45, w: 4, d: 5, h: 5 },
-    // Jih
-    { x: 60, z: 70, w: 4, d: 4, h: 5 }, { x: 80, z: 65, w: 5, d: 5, h: 6 },
-    { x: 50, z: 80, w: 4, d: 5, h: 5 }, { x: 85, z: 75, w: 5, d: 4, h: 5 },
-];
+export const ZONES = {
+    SUBURA: {
+        bounds: { x1: 20, z1: -50, x2: 80, z2: -10 },
+        style: 'insulae_dense',
+        floors: { min: 3, max: 5 },
+        blockSize: { min: 15, max: 22 }
+    },
+    PALATIN: {
+        bounds: { x1: 10, z1: 30, x2: 60, z2: 80 },
+        style: 'villas',
+        blockSize: { min: 20, max: 30 }
+    },
+    CAMPUS_MARTIUS: {
+        bounds: { x1: -60, z1: 10, x2: -10, z2: 50 },
+        style: 'insulae_dense',
+        floors: { min: 2, max: 4 },
+        blockSize: { min: 18, max: 25 }
+    },
+    FORUM: {
+        bounds: { x1: 10, z1: 20, x2: 50, z2: 50 },
+        style: 'forum',
+        blockSize: { min: 30, max: 40 }
+    },
+    TRASTEVERE: {
+        bounds: { x1: -90, z1: 20, x2: -45, z2: 70 },
+        style: 'insulae_dense',
+        floors: { min: 2, max: 3 },
+        blockSize: { min: 12, max: 18 }
+    },
+    AVENTIN: {
+        bounds: { x1: 30, z1: 50, x2: 80, z2: 90 },
+        style: 'insulae_dense',
+        floors: { min: 2, max: 4 },
+        blockSize: { min: 15, max: 22 }
+    },
+    CAPITOL: {
+        bounds: { x1: -10, z1: -50, x2: 25, z2: -20 },
+        style: 'temple',
+        blockSize: { min: 20, max: 30 }
+    }
+};
 
 // ═══════════════════════════════════════════════════════════════
-//  PAMÁTKY (speciální budovy)
+//  ZÁKLADNÍ BUDOVY (fallback pro minimap)
+// ═══════════════════════════════════════════════════════════════
+export const BUILDINGS = [];
+
+// ═══════════════════════════════════════════════════════════════
+//  PAMÁTKY (speciální budovy — antický Řím 1. stol. n.l.)
 // ═══════════════════════════════════════════════════════════════
 export const LANDMARKS = {
-    // Koloseum — velký ovál, 4 patra oblouků
-    COLOSSEUM: { x: 70, z: 55, rx: 32, rz: 26, h: 14 },
-    // Pantheon — kruh + portikus
-    PANTHEON:  { x: -5, z: 15, r: 12, h: 14 },
-    // Vatikán — velký plac + bazilika s kupolí
-    VATICAN:   { x: -65, z: -55, w: 25, d: 35, h: 10, domeH: 18 },
-    // Castel Sant'Angelo — kruhová pevnost
-    CASTEL:    { x: 45, z: -15, r: 7, h: 12 },
+    // Koloseum — 4 patra oblouků, částečně zborcené
+    COLOSSEUM:    { x: 70, z: 55, rx: 32, rz: 26, h: 16 },
+    // Pantheon — 16 sloupů, korintské hlavice
+    PANTHEON:     { x: -5, z: 15, r: 12, h: 15 },
     // Pyramida Cestia
-    PYRAMID:   { x: 75, z: 75, w: 10, h: 12 },
-    // Vittoriano — bílý monument
-    VITTORIANO:{ x: 25, z: -30, w: 18, d: 8, h: 12 },
+    PYRAMID:      { x: 75, z: 75, w: 10, h: 12 },
+    // Thermae — lázně, velký komplex
+    THERMAE:      { x: -50, z: 55, w: 20, d: 30, h: 8 },
+    // Circus Maximus — závodiště
+    CIRCUS:       { x: 50, z: -55, w: 15, d: 80, h: 2 },
+    // Templum Jovis Capitolini — největší chrám
+    TEMPLE_JOVIS: { x: 5, z: -35, w: 18, d: 20, h: 10 },
+    // Mausoleum Augusti — kruhová stavba
+    MAUSOLEUM:    { x: -40, z: -50, r: 12, h: 10 },
+    // Triumfální oblouk (Arcus Titi)
+    ARCH:         { x: 25, z: 40, w: 8, d: 4, h: 10 },
+    // Basilica Julia
+    BASILICA:     { x: 30, z: 35, w: 12, d: 20, h: 8 },
 };
 
 // Forum Romano — ruiny (sloupy + rozpadlé zdi)

@@ -6,8 +6,9 @@ import { COLUMNS, TREES, TOMBSTONES, RUIN_STONES, COLORS } from '../config.js';
  * sochy, lavičky, fontány, pochodně.
  */
 export class DecorationManager {
-    constructor(scene) {
+    constructor(scene, assetLoader = null) {
         this.scene = scene;
+        this.assetLoader = assetLoader;
     }
 
     generate() {
@@ -20,6 +21,11 @@ export class DecorationManager {
         this.createBenches();
         this.createFountains();
         this.createTorches();
+        this.createStreetItems();
+        this.createMarketStalls();
+        this.createStreetFountains();
+        this.createBoundaryStones();
+        this.createCarts();
     }
 
     /** Dórské sloupy — válec + abakus + echinus + base */
@@ -34,7 +40,7 @@ export class DecorationManager {
                 shaftMat
             );
             shaft.position.set(x, 2.6, z);
-            shaft.castShadow = true;
+            shaft.castShadow = false;
             this.scene.add(shaft);
 
             // Echinus (zaoblená část pod hlavicí)
@@ -80,7 +86,7 @@ export class DecorationManager {
             new THREE.MeshStandardMaterial({ color: COLORS.treeTrunk })
         );
         trunk.position.set(x, 1, z);
-        trunk.castShadow = true;
+        trunk.castShadow = false;
         this.scene.add(trunk);
 
         const leaf = new THREE.Mesh(
@@ -88,7 +94,7 @@ export class DecorationManager {
             new THREE.MeshStandardMaterial({ color: 0x1E3A1E, roughness: 0.9 })
         );
         leaf.position.set(x, 4, z);
-        leaf.castShadow = true;
+        leaf.castShadow = false;
         this.scene.add(leaf);
     }
 
@@ -99,7 +105,7 @@ export class DecorationManager {
             new THREE.MeshStandardMaterial({ color: COLORS.treeTrunk })
         );
         trunk.position.set(x, 0.75, z);
-        trunk.castShadow = true;
+        trunk.castShadow = false;
         this.scene.add(trunk);
 
         const leaf = new THREE.Mesh(
@@ -108,7 +114,7 @@ export class DecorationManager {
         );
         leaf.position.set(x, 2.2, z);
         leaf.scale.y = 0.6;
-        leaf.castShadow = true;
+        leaf.castShadow = false;
         this.scene.add(leaf);
     }
 
@@ -120,7 +126,7 @@ export class DecorationManager {
         );
         trunk.position.set(x, 0.9, z);
         trunk.rotation.z = (Math.random() - 0.5) * 0.3;
-        trunk.castShadow = true;
+        trunk.castShadow = false;
         this.scene.add(trunk);
 
         const leaf = new THREE.Mesh(
@@ -128,7 +134,7 @@ export class DecorationManager {
             new THREE.MeshStandardMaterial({ color: 0x8FA88F, roughness: 0.95 })
         );
         leaf.position.set(x, 2.2, z);
-        leaf.castShadow = true;
+        leaf.castShadow = false;
         this.scene.add(leaf);
     }
 
@@ -139,7 +145,7 @@ export class DecorationManager {
             const t = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.2), mat);
             t.position.set(x, 0.4, z);
             t.rotation.y = (Math.random() - 0.5) * 0.5;
-            t.castShadow = true;
+            t.castShadow = false;
             this.scene.add(t);
         });
     }
@@ -152,7 +158,7 @@ export class DecorationManager {
             const stone = new THREE.Mesh(new THREE.BoxGeometry(size, size * 0.6, size), mat);
             stone.position.set(x, size * 0.3, z);
             stone.rotation.y = Math.random() * Math.PI;
-            stone.castShadow = true;
+            stone.castShadow = false;
             this.scene.add(stone);
         });
     }
@@ -162,7 +168,7 @@ export class DecorationManager {
         const mat = new THREE.MeshStandardMaterial({ color: COLORS.pier, roughness: 0.9 });
         const pier = new THREE.Mesh(new THREE.BoxGeometry(12, 0.2, 3), mat);
         pier.position.set(35, 0.3, 35);
-        pier.castShadow = true;
+        pier.castShadow = false;
         pier.receiveShadow = true;
         this.scene.add(pier);
 
@@ -176,32 +182,48 @@ export class DecorationManager {
         }
     }
 
-    /** Sochy — mramor, cylindr + sphere + arms (zjednodušené) */
+    /** Sochy — GLB modely nebo fallback cylindr + sphere */
     createStatues() {
-        const marble = new THREE.MeshStandardMaterial({ color: 0xF0EAD6, roughness: 0.5 });
+        const statueKeys = ['statue_bacchus', 'statue_woman', 'statue_pincio', 'statue_asklepios'];
         const positions = [
             { x: -5, z: -5 }, { x: 5, z: -5 },
             { x: -5, z: 5 },  { x: 5, z: 5 },
             { x: 10, z: 0 },  { x: -10, z: 0 }
         ];
 
-        positions.forEach(({ x, z }) => {
-            // Podstavec
+        positions.forEach(({ x, z }, i) => {
+            const key = statueKeys[i % statueKeys.length];
+            const glb = this.assetLoader ? this.assetLoader.getModel(key) : null;
+
+            if (glb) {
+                const clone = glb.clone();
+                const bounds = this.assetLoader.getModelBounds(key);
+                if (bounds) {
+                    const size = new THREE.Vector3();
+                    bounds.getSize(size);
+                    const scale = 2.5 / size.y;
+                    clone.scale.set(scale, scale, scale);
+                }
+                clone.position.set(x, 0, z);
+                const tmpBox = new THREE.Box3().setFromObject(clone);
+                clone.position.y -= tmpBox.min.y;
+                this.scene.add(clone);
+                return;
+            }
+
+            // Fallback
+            const marble = new THREE.MeshStandardMaterial({ color: 0xF0EAD6, roughness: 0.5 });
             const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), marble);
             base.position.set(x, 0.4, z);
-            base.castShadow = true;
+            base.castShadow = false;
             this.scene.add(base);
-
-            // Tělo
             const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.2, 8), marble);
             body.position.set(x, 1.4, z);
-            body.castShadow = true;
+            body.castShadow = false;
             this.scene.add(body);
-
-            // Hlava
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), marble);
             head.position.set(x, 2.1, z);
-            head.castShadow = true;
+            head.castShadow = false;
             this.scene.add(head);
         });
     }
@@ -219,7 +241,7 @@ export class DecorationManager {
             // Sedák
             const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), wood);
             seat.position.set(x, 0.5, z);
-            seat.castShadow = true;
+            seat.castShadow = false;
             this.scene.add(seat);
 
             // Nohy
@@ -231,14 +253,30 @@ export class DecorationManager {
         });
     }
 
-    /** Fontány */
+    /** Fontány — GLB model nebo fallback */
     createFountains() {
+        const glb = this.assetLoader ? this.assetLoader.getModel('fountain') : null;
+        if (glb) {
+            const clone = glb.clone();
+            const bounds = this.assetLoader.getModelBounds('fountain');
+            if (bounds) {
+                const size = new THREE.Vector3();
+                bounds.getSize(size);
+                const scale = 3.5 / size.y;
+                clone.scale.set(scale, scale, scale);
+            }
+            clone.position.set(0, 0, 15);
+            const tmpBox = new THREE.Box3().setFromObject(clone);
+            clone.position.y -= tmpBox.min.y;
+            this.scene.add(clone);
+            return;
+        }
+
         const stone = new THREE.MeshStandardMaterial({ color: 0x9B8B7F, roughness: 0.7 });
         const waterMat = new THREE.MeshStandardMaterial({
             color: 0x4A7A9A, transparent: true, opacity: 0.7, roughness: 0.1
         });
 
-        // Fontána u fóra
         const basin = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.2, 0.5, 16), stone);
         basin.position.set(0, 0.25, 15);
         basin.receiveShadow = true;
@@ -250,7 +288,7 @@ export class DecorationManager {
 
         const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.5, 8), stone);
         pillar.position.set(0, 1, 15);
-        pillar.castShadow = true;
+        pillar.castShadow = false;
         this.scene.add(pillar);
     }
 
@@ -262,7 +300,6 @@ export class DecorationManager {
         ];
 
         positions.forEach(({ x, z }) => {
-            // Tyč
             const pole = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.05, 0.05, 2.5, 6),
                 new THREE.MeshStandardMaterial({ color: 0x3A2F25 })
@@ -270,7 +307,6 @@ export class DecorationManager {
             pole.position.set(x, 1.25, z);
             this.scene.add(pole);
 
-            // Miska
             const bowl = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.15, 0.08, 0.2, 8),
                 new THREE.MeshStandardMaterial({ color: 0x5C4033 })
@@ -278,7 +314,6 @@ export class DecorationManager {
             bowl.position.set(x, 2.5, z);
             this.scene.add(bowl);
 
-            // Plamen (glowing sphere)
             const flame = new THREE.Mesh(
                 new THREE.SphereGeometry(0.08, 6, 6),
                 new THREE.MeshBasicMaterial({ color: 0xFFAA33 })
@@ -286,10 +321,225 @@ export class DecorationManager {
             flame.position.set(x, 2.65, z);
             this.scene.add(flame);
 
-            // Point light
             const light = new THREE.PointLight(0xFF8822, 2, 8);
             light.position.set(x, 2.7, z);
             this.scene.add(light);
+        });
+    }
+
+    /** Uliční předměty — amfory, sudy, košíky */
+    createStreetItems() {
+        const terakota = new THREE.MeshStandardMaterial({ color: 0xA06030, roughness: 0.85 });
+        const wood = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
+
+        const amphoraPositions = [
+            { x: -8, z: 5 }, { x: -6, z: 8 }, { x: 12, z: -5 },
+            { x: 20, z: 20 }, { x: 25, z: 18 }, { x: 30, z: 22 },
+            { x: -20, z: 15 }, { x: -25, z: 20 }, { x: 40, z: -20 },
+            { x: 50, z: -30 }, { x: 55, z: -25 }, { x: -50, z: 40 },
+            { x: -55, z: 45 }, { x: 60, z: 60 }, { x: 65, z: 55 }
+        ];
+
+        amphoraPositions.forEach(({ x, z }) => {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            // Tělo amfory — zúžená
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.2, 0.6, 8),
+                terakota
+            );
+            body.position.y = 0.4;
+            group.add(body);
+
+            // Ucho
+            const handle = new THREE.Mesh(
+                new THREE.TorusGeometry(0.08, 0.02, 6, 8, Math.PI),
+                terakota
+            );
+            handle.position.set(0.15, 0.5, 0);
+            handle.rotation.z = Math.PI / 2;
+            group.add(handle);
+
+            // Hrdlo
+            const neck = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.12, 0.2, 8),
+                terakota
+            );
+            neck.position.y = 0.8;
+            group.add(neck);
+
+            group.rotation.y = Math.random() * Math.PI;
+            this.scene.add(group);
+        });
+
+        // Soudky
+        const barrelPositions = [
+            { x: -15, z: 10 }, { x: 15, z: -10 }, { x: 35, z: 30 }
+        ];
+        barrelPositions.forEach(({ x, z }) => {
+            const barrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.35, 0.35, 0.7, 8),
+                wood
+            );
+            barrel.position.set(x, 0.35, z);
+            barrel.rotation.z = Math.PI / 2;
+            barrel.castShadow = false;
+            this.scene.add(barrel);
+        });
+    }
+
+    /** Tržištní stánky (mensae) */
+    createMarketStalls() {
+        const wood = new THREE.MeshStandardMaterial({ color: 0x6B4B2B, roughness: 0.9 });
+        const cloth = new THREE.MeshStandardMaterial({ color: 0xC8A060, roughness: 0.95, side: THREE.DoubleSide });
+
+        const stalls = [
+            { x: 22, z: 32 }, { x: 26, z: 35 }, { x: 18, z: 36 },
+            { x: 24, z: 30 }, { x: 28, z: 33 }, { x: 20, z: 34 }
+        ];
+
+        stalls.forEach(({ x, z }) => {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            // Stůl
+            const table = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 0.8), wood);
+            table.position.y = 0.4;
+            table.castShadow = false;
+            group.add(table);
+
+            // Nohy
+            [-0.6, 0.6].forEach(ox => {
+                [-0.3, 0.3].forEach(oz => {
+                    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.8, 0.08), wood);
+                    leg.position.set(ox, 0.4, oz);
+                    group.add(leg);
+                });
+            });
+
+            // Zboží na stole — malé barevné krychličky
+            for (let i = 0; i < 5; i++) {
+                const item = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.12, 0.12, 0.12),
+                    new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(Math.random(), 0.5, 0.5)
+                    })
+                );
+                item.position.set(-0.4 + i * 0.2, 0.9, (Math.random() - 0.5) * 0.3);
+                group.add(item);
+            }
+
+            // Plachta / střecha
+            const awning = new THREE.Mesh(new THREE.BoxGeometry(2, 0.05, 1.2), cloth);
+            awning.position.set(0, 1.4, 0);
+            awning.castShadow = false;
+            group.add(awning);
+
+            // Tyče plachty
+            [-0.9, 0.9].forEach(ox => {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), wood);
+                pole.position.set(ox, 0.75, 0);
+                group.add(pole);
+            });
+
+            this.scene.add(group);
+        });
+    }
+
+    /** Pouliční kašny (lacus) — každých ~30 jednotek */
+    createStreetFountains() {
+        const stone = new THREE.MeshStandardMaterial({ color: 0x8B7D6B, roughness: 0.8 });
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x4A7A9A, transparent: true, opacity: 0.7, roughness: 0.1
+        });
+
+        const positions = [
+            { x: 10, z: 10 }, { x: -20, z: -20 }, { x: 40, z: -10 },
+            { x: -40, z: 30 }, { x: 0, z: -30 }, { x: -60, z: -10 }
+        ];
+
+        positions.forEach(({ x, z }) => {
+            // Nádrž
+            const basin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), stone);
+            basin.position.set(x, 0.3, z);
+            basin.castShadow = false;
+            this.scene.add(basin);
+
+            // Voda
+            const water = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 1), waterMat);
+            water.position.set(x, 0.55, z);
+            this.scene.add(water);
+
+            // Sloupek
+            const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.2, 8), stone);
+            pillar.position.set(x, 1.0, z);
+            this.scene.add(pillar);
+        });
+    }
+
+    /** Hraniční kameny (hermai) */
+    createBoundaryStones() {
+        const stone = new THREE.MeshStandardMaterial({ color: 0x8B7D6B, roughness: 0.85 });
+
+        const positions = [
+            { x: -5, z: -15 }, { x: 15, z: 5 }, { x: -25, z: 25 },
+            { x: 35, z: -25 }, { x: 5, z: 35 }
+        ];
+
+        positions.forEach(({ x, z }) => {
+            // Sloupek
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.5, 0.3), stone);
+            pillar.position.set(x, 0.75, z);
+            pillar.castShadow = false;
+            this.scene.add(pillar);
+
+            // Hlava (koule)
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), stone);
+            head.position.set(x, 1.6, z);
+            this.scene.add(head);
+        });
+    }
+
+    /** Vozíky (carrus) */
+    createCarts() {
+        const wood = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x4A3520, roughness: 0.95 });
+
+        const carts = [
+            { x: 5, z: 5, r: 0.3 },
+            { x: -15, z: -5, r: -0.5 },
+            { x: 25, z: -15, r: 0.8 }
+        ];
+
+        carts.forEach(({ x, z, r }) => {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.rotation.y = r;
+
+            // Korba
+            const bed = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.0), wood);
+            bed.position.y = 0.6;
+            bed.castShadow = false;
+            group.add(bed);
+
+            // Kola
+            [-0.8, 0.8].forEach(ox => {
+                const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.04, 8, 12), wheelMat);
+                wheel.position.set(ox, 0.25, 0.6);
+                group.add(wheel);
+                const wheel2 = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.04, 8, 12), wheelMat);
+                wheel2.position.set(ox, 0.25, -0.6);
+                group.add(wheel2);
+            });
+
+            // Osa
+            const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), wood);
+            axle.rotation.x = Math.PI / 2;
+            axle.position.y = 0.25;
+            group.add(axle);
+
+            this.scene.add(group);
         });
     }
 }

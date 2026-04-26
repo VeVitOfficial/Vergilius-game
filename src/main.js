@@ -3,7 +3,7 @@ import { PLAYER, HOME, INTERACTION, COLORS, DOORS } from './config.js';
 import { gameState } from './gameState.js';
 import { Player } from './player.js';
 import { TerrainManager } from './world/terrain.js';
-import { BuildingManager } from './world/buildings.js';
+import { CityLayout } from './world/cityLayout.js';
 import { DecorationManager } from './entities/decoration.js';
 import { BookManager } from './entities/book.js';
 import { HUD } from './ui/hud.js';
@@ -17,126 +17,287 @@ import { LandmarkManager } from './world/landmarks.js';
 import { InteriorManager } from './interiors/interiorManager.js';
 import { ParticleManager } from './effects/particles.js';
 import { AudioManager } from './audio/audioManager.js';
+import { NPCManager } from './entities/npcs.js';
+import { AssetLoader } from './assets/assetLoader.js';
+import { CullingManager } from './world/cullingManager.js';
 import './style.css';
 
 // ═══════════════════════════════════════════════════════════════
 //  HLAVNÍ INICIALIZACE
 // ═══════════════════════════════════════════════════════════════
 
+let terrainManager, cityLayout, decorationManager, bookManager, skyManager,
+    tiberManager, landmarkManager, interiorManager, particleManager,
+    audioManager, npcManager, hud, minimap, menu, pauseMenu, minigameManager, player,
+    cullingManager;
+
+const assetLoader = new AssetLoader();
+
 const canvas = document.getElementById('game-canvas');
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+renderer.setPixelRatio(1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
+// Debug stats overlay
+const statsEl = document.createElement('div');
+statsEl.style.cssText = 'position:fixed;top:60px;left:20px;color:#FFD700;font-family:monospace;font-size:14px;z-index:1000;text-shadow:1px 1px 2px #000;background:rgba(0,0,0,0.5);padding:8px;border-radius:4px;';
+document.body.appendChild(statsEl);
+
+let frameCount = 0;
+let lastFpsUpdate = performance.now();
+let currentFps = 0;
+
+function updateGameStats() {
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFpsUpdate > 500) {
+        currentFps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        frameCount = 0;
+        lastFpsUpdate = now;
+    }
+
+    let visibleMeshes = 0, totalMeshes = 0, totalTriangles = 0;
+    scene.traverse(obj => {
+        if (obj.isMesh) {
+            totalMeshes++;
+            if (obj.visible) {
+                visibleMeshes++;
+                if (obj.geometry?.index) {
+                    totalTriangles += obj.geometry.index.count / 3;
+                } else if (obj.geometry?.attributes?.position) {
+                    totalTriangles += obj.geometry.attributes.position.count / 3;
+                }
+            }
+        }
+    });
+
+    const info = renderer.info;
+
+    statsEl.innerHTML = `
+    FPS: <b>${currentFps}</b><br>
+    Meshes: ${visibleMeshes} / ${totalMeshes}<br>
+    Draw calls: <b>${info.render.calls}</b><br>
+    Triangles rendered: ${(info.render.triangles/1000).toFixed(1)}k<br>
+    Triangles total: ${(totalTriangles/1000).toFixed(0)}k<br>
+    Geometries: ${info.memory.geometries}<br>
+    Textures: ${info.memory.textures}
+    `;
+}
+
 // Scéna
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xC8A878);
-scene.fog = new THREE.FogExp2(0xC8A878, 0.008);
+scene.background = new THREE.Color(0xE8C8A0);
+scene.fog = new THREE.FogExp2(0xE8C8A0, 0.015);
 
 // Kamera
 const camera = new THREE.PerspectiveCamera(PLAYER.fov, window.innerWidth / window.innerHeight, PLAYER.near, PLAYER.far);
 
 // ═══ OSVĚTLENÍ ═══
-// Ambient — slabé, teplé základní osvětlení
-const ambientLight = new THREE.AmbientLight(0xB8A888, 0.3);
+// Ambient — teplé základní osvětlení
+const ambientLight = new THREE.AmbientLight(0xD4B896, 0.25);
 scene.add(ambientLight);
 
-// Hemisphere — nebeské světlo shora, zemní odraz zdola
-const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.6);
+// Hemisphere — mediteránní nebe shora, teplá hlína zdola
+const hemiLight = new THREE.HemisphereLight(0xC8DDEF, 0xA88860, 0.5);
 scene.add(hemiLight);
 
-// Directional (slunce) — hlavní světlo s dlouhými stíny
-const sunLight = new THREE.DirectionalLight(0xFFF4E0, 1.2);
-sunLight.position.set(50, 80, 30);
+// Directional (slunce) — pozdní odpoledne, dlouhé stíny
+const sunLight = new THREE.DirectionalLight(0xFFE4B5, 1.4);
+sunLight.position.set(60, 40, 20);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 2048;
-sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.mapSize.width = 1024;
+sunLight.shadow.mapSize.height = 1024;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 250;
-const shadowRange = 120;
+sunLight.shadow.bias = -0.0003;
+sunLight.shadow.normalBias = 0.05;
+const shadowRange = 50;
 sunLight.shadow.camera.left = -shadowRange;
 sunLight.shadow.camera.right = shadowRange;
 sunLight.shadow.camera.top = shadowRange;
 sunLight.shadow.camera.bottom = -shadowRange;
+sunLight.shadow.camera.far = 100;
 scene.add(sunLight);
 
-// Herní manažeři
-const terrainManager = new TerrainManager(scene);
-const buildingManager = new BuildingManager(scene);
-const decorationManager = new DecorationManager(scene);
-const bookManager = new BookManager(scene);
-const skyManager = new SkyManager(scene);
-const tiberManager = new TiberManager(scene);
-const landmarkManager = new LandmarkManager(scene);
-const interiorManager = new InteriorManager(scene);
-const particleManager = new ParticleManager(scene);
-const audioManager = new AudioManager();
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
 
-terrainManager.generate();
-buildingManager.generate();
-decorationManager.generate();
-bookManager.generate();
-skyManager.generate();
-tiberManager.generate();
-landmarkManager.generate();
-interiorManager.generate();
-particleManager.generate();
+async function preloadEverything() {
+    const loadingBar = document.getElementById('loading-bar-fill');
+    const loadingStatus = document.getElementById('loading-status');
+    const loadingPercent = document.getElementById('loading-percent');
 
-// UI
-const hud = new HUD();
-const minimap = new Minimap();
-
-// Start menu
-const menu = new Menu(() => {
-    gameState.isGameStarted = true;
-    player.lock();
-    hud.show();
-    audioManager.init();
-    audioManager.startCityAmbient();
-});
-
-// Pause menu
-const pauseMenu = new PauseMenu(
-    (resuming) => {
-        if (resuming) {
-            gameState.isPaused = false;
-            clock.getDelta();
-            player.lock();
-            audioManager.resume();
-        } else {
-            gameState.isPaused = true;
-            player.unlock();
-        }
-    },
-    () => {
-        // Restart
-        location.reload();
-    },
-    () => {
-        // Quit → zpět na main menu
-        gameState.reset();
-        pauseMenu.visible = false;
-        player.unlock();
-        hud.hide();
-        menu.show();
+    function updateLoading(percent, status) {
+        if (loadingBar) loadingBar.style.width = `${percent * 100}%`;
+        if (loadingPercent) loadingPercent.textContent = `${Math.floor(percent * 100)}%`;
+        if (status && loadingStatus) loadingStatus.textContent = status;
     }
-);
 
-// Minigame manager
-const minigameManager = new MinigameManager(() => {
-    // Po zavření minihry → obnov pointer lock po user gesture (kliknutí)
-    hud.setBookCounter(gameState.getDeliveredCount());
-    // Pointer lock se obnoví až po kliknutí na canvas (browser policy)
+    const menuOverlay = document.getElementById('menu-overlay');
+    if (menuOverlay) menuOverlay.style.display = 'none';
+
+    updateLoading(0, 'Inicializace...');
+    await sleep(100);
+
+    // Herní manažeři (konstruktory — bez generate)
+    terrainManager = new TerrainManager(scene, assetLoader);
+    cityLayout = new CityLayout(scene, assetLoader);
+    decorationManager = new DecorationManager(scene, assetLoader);
+    bookManager = new BookManager(scene);
+    skyManager = new SkyManager(scene);
+    tiberManager = new TiberManager(scene);
+    landmarkManager = new LandmarkManager(scene, assetLoader);
+    interiorManager = new InteriorManager(scene);
+    particleManager = new ParticleManager(scene);
+    audioManager = new AudioManager();
+    npcManager = new NPCManager(scene);
+
+    // FÁZE 1: Načti assety
+    updateLoading(0.05, 'Načítání 3D modelů...');
+    await assetLoader.loadAll((progress) => {
+        updateLoading(0.05 + progress * 0.45, `Načítání 3D modelů... ${Math.floor(progress * 100)}%`);
+    });
+
+    // FÁZE 2: Generuj svět
+    updateLoading(0.5, 'Stavba Říma...');
+    await sleep(50);
+    terrainManager.generate();
+
+    updateLoading(0.6, 'Stavba budov...');
+    await sleep(50);
+    cityLayout.generate();
+
+    updateLoading(0.7, 'Stavba památek...');
+    await sleep(50);
+    landmarkManager.generate();
+
+    updateLoading(0.8, 'Umisťování dekorací...');
+    await sleep(50);
+    decorationManager.generate();
+    bookManager.generate();
+
+    updateLoading(0.85, 'Stavba interiérů...');
+    await sleep(50);
+    interiorManager.generate();
+
+    updateLoading(0.9, 'Tibera teče...');
+    await sleep(50);
+    tiberManager.generate();
+    skyManager.generate();
+    particleManager.generate();
+    npcManager.generate();
+
+    // Oprava frustum culling — bounding spheres na všech meshech
+    function fixFrustumCulling() {
+        let fixed = 0;
+        scene.traverse(obj => {
+            if (obj.isMesh) {
+                obj.frustumCulled = true;
+                if (obj.geometry && !obj.geometry.boundingSphere) {
+                    obj.geometry.computeBoundingSphere();
+                    fixed++;
+                }
+                if (obj.geometry && !obj.geometry.boundingBox) {
+                    obj.geometry.computeBoundingBox();
+                }
+            }
+            if (obj.isInstancedMesh) {
+                obj.frustumCulled = true;
+                obj.computeBoundingSphere();
+            }
+        });
+        console.log('[Culling] Fixed bounding spheres on', fixed, 'meshes');
+    }
+    fixFrustumCulling();
+
+    // Vypni castShadow u malých objektů
+    scene.traverse(obj => {
+        if (!obj.isMesh) return;
+        if (obj.geometry?.boundingSphere?.radius < 3) {
+            obj.castShadow = false;
+        }
+    });
+
+    // Distance culling manager
+    cullingManager = new CullingManager(scene, camera);
+    cullingManager.scan();
+
+    // FÁZE 3: GPU warm-up
+    updateLoading(0.95, 'Příprava grafiky...');
+    await sleep(50);
+    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+    await sleep(100);
+
+    // FÁZE 4: Hotovo
+    updateLoading(1.0, 'Připraveno!');
+    await sleep(500);
+
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'none';
+    if (menuOverlay) menuOverlay.style.display = 'flex';
+
+    // UI
+    hud = new HUD();
+    minimap = new Minimap();
+
+    // Start menu
+    menu = new Menu(() => {
+        gameState.isGameStarted = true;
+        player.lock();
+        hud.show();
+        audioManager.init();
+        audioManager.startCityAmbient();
+    });
+
+    // Pause menu
+    pauseMenu = new PauseMenu(
+        (resuming) => {
+            if (resuming) {
+                gameState.isPaused = false;
+                clock.getDelta();
+                player.lock();
+                audioManager.resume();
+            } else {
+                gameState.isPaused = true;
+                player.unlock();
+            }
+        },
+        () => {
+            location.reload();
+        },
+        () => {
+            gameState.reset();
+            pauseMenu.visible = false;
+            player.unlock();
+            hud.hide();
+            menu.show();
+        }
+    );
+
+    // Minigame manager
+    minigameManager = new MinigameManager(() => {
+        hud.setBookCounter(gameState.getDeliveredCount());
+    });
+
+    // Hráč
+    player = new Player(camera, document.body);
+
+    gameLoop();
+}
+
+preloadEverything().catch((err) => {
+    console.error('Game preload failed:', err);
+    const loadingStatus = document.getElementById('loading-status');
+    if (loadingStatus) loadingStatus.textContent = 'Chyba načítání. Zkuste obnovit stránku.';
 });
-
-// Hráč
-const player = new Player(camera, document.body);
 
 // ─── DOMUS LABEL (HTML overlay následující 3D pozici) ──────
 const domusLabel = document.getElementById('domus-label');
@@ -159,7 +320,7 @@ function updateDomusLabel() {
 // ─── INTERAKCE (stisk E) ──────────────────────────────────
 document.addEventListener('keydown', (e) => {
     if (e.code !== 'KeyE') return;
-    if (!player.isLocked()) return;
+    if (!player || !player.isLocked()) return;
     if (minigameManager.isActive()) return;
     if (gameState.isPaused) return;
     if (gameState.gameWon) return;
@@ -223,6 +384,7 @@ document.addEventListener('keydown', (e) => {
 // Když je hra aktivní, ale pointer lock není (např. po minihře/pauze),
 // kliknutí na canvas ho obnoví
 canvas.addEventListener('click', () => {
+    if (!player || !minigameManager) return;
     if (gameState.isGameStarted && !gameState.isPaused && !gameState.gameWon && !minigameManager.isActive()) {
         if (!player.isLocked()) {
             player.lock();
@@ -262,6 +424,9 @@ function gameLoop() {
     // Částice
     particleManager.update(time);
 
+    // NPCs
+    npcManager.update(time);
+
     // Hlavní herní logika — pouze pokud není pauza/minihra/výhra
     if (!gameState.isPaused && !minigameManager.isActive() && !gameState.gameWon) {
         // Pohyb hráče s AABB collision (venku nebo uvnitř)
@@ -269,7 +434,7 @@ function gameLoop() {
             if (interiorManager.isInside()) {
                 return interiorManager.checkCollision(box);
             }
-            return buildingManager.checkCollision(box);
+            return cityLayout.checkCollision(box);
         });
 
         const pos = player.getWorldPosition();
@@ -315,9 +480,10 @@ function gameLoop() {
         }
     }
 
+    if (cullingManager) cullingManager.update(time);
+
     renderer.render(scene, camera);
+    updateGameStats();
 }
 
-// Start
-menu.show();
-gameLoop();
+// Inicializace běží asynchronně — viz init() výše
